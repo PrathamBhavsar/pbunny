@@ -12,7 +12,7 @@ class PageScraper:
     def __init__(self, timeout: int = 30):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.timeout = timeout
-        self.base_url = "https://pimpbunny.com/videos/{}/?videos_per_page=128&sort_by=post_date"
+        self.base_url = "https://pimpbunny.com/videos/{}/?videos_per_page=32&sort_by=post_date"
         
     def fetch_html(self, page: int) -> Optional[str]:
         try:
@@ -56,7 +56,7 @@ class PageScraper:
     
     def scrape(self) -> List[str]:
         try:
-            page = 370
+            page = 1515
             all_links = []
             
             while True:
