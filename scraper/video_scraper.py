@@ -51,7 +51,6 @@ class VideoScraper:
                 if not video_id_str:
                     continue
 
-                # Convert video_id to int safely
                 try:
                     video_id = int(video_id_str)
                 except ValueError:
@@ -62,7 +61,10 @@ class VideoScraper:
                 if title:
                     title = title.replace("\\", "").replace("/", "").strip()
 
-                models = self._extract_field(script_content, r"video_models:\s*'([^']+)'")
+                # Convert model string to list
+                models_str = self._extract_field(script_content, r"video_models:\s*'([^']+)'")
+                models = [m.strip() for m in models_str.split(',')] if models_str else []
+
                 categories_str = self._extract_field(script_content, r"video_categories:\s*'([^']*)'")
                 categories = [cat.strip() for cat in categories_str.split(',')] if categories_str else []
                 categories = [cat for cat in categories if cat]
@@ -73,7 +75,7 @@ class VideoScraper:
                 return {
                     'video_id': video_id,
                     'title': title or '',
-                    'model': models or '',
+                    'model': models,
                     'categories': categories,
                     'video_urls': video_urls,
                 }
@@ -97,15 +99,17 @@ class VideoScraper:
                 if not href.startswith("http"):
                     continue
 
-                href = re.sub(r'([&?])download=true$', '', href)
+                # Filter out URLs without quality indicator (e.g. _720p.mp4, _1080p.mp4)
+                if not re.search(r'_\d+p\.mp4', href):
+                    continue
 
+                href = re.sub(r'([&?])download=true$', '', href)
                 urls.append(href)
 
             return urls
         except Exception as e:
             self.logger.error(f"Error extracting video URLs: {e}", exc_info=True)
             return []
-
 
     def _extract_field(self, text: str, pattern: str) -> Optional[str]:
         try:

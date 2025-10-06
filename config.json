@@ -1,0 +1,5 @@
+{
+  "base_url": "https://pimpbunny.com/videos/1/?videos_per_page=32&sort_by=post_date",
+  "downloads_dir": "./downloads",
+  "timeout": 30
+}

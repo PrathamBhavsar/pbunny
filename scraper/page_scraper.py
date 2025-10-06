@@ -9,14 +9,14 @@ logging.basicConfig(
 )
 
 class PageScraper:
-    def __init__(self, timeout: int = 30):
+    def __init__(self, base_url: str, timeout: int = 30):
         self.logger = logging.getLogger(self.__class__.__name__)
+        self.base_url_template = base_url.replace('/1/', '/{}/')
         self.timeout = timeout
-        self.base_url = "https://pimpbunny.com/videos/{}/?videos_per_page=32&sort_by=post_date"
         
     def fetch_html(self, page: int) -> Optional[str]:
         try:
-            url = self.base_url.format(page)
+            url = self.base_url_template.format(page)
             with httpx.Client(timeout=self.timeout, follow_redirects=True) as client:
                 response = client.get(url)
                 response.raise_for_status()
@@ -56,7 +56,7 @@ class PageScraper:
     
     def scrape(self) -> List[str]:
         try:
-            page = 1515
+            page = 1526
             all_links = []
             
             while True:

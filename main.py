@@ -2,6 +2,7 @@ import logging
 from scraper.page_scraper import PageScraper
 from scraper.video_scraper import VideoScraper
 from scraper.download_manager import DownloadManager
+from scraper.config_manager import ConfigManager
 
 logging.basicConfig(
     level=logging.INFO,
@@ -12,10 +13,18 @@ logger = logging.getLogger(__name__)
 
 def main():
     try:
-        page_scraper = PageScraper(timeout=30)
-        video_scraper = VideoScraper(timeout=30, output_dir="U:\\code\\pbunny\\downloads")
-        download_manager = DownloadManager(downloads_dir="U:\\code\\pbunny\\downloads")
-
+        config_manager = ConfigManager("config.json")
+        
+        base_url = config_manager.get_base_url()
+        downloads_dir = config_manager.get_downloads_dir()
+        timeout = config_manager.get_timeout()
+        
+        logger.info(f"Loaded config - URL: {base_url}, Dir: {downloads_dir}, Timeout: {timeout}s")
+        
+        page_scraper = PageScraper(base_url=base_url, timeout=timeout)
+        video_scraper = VideoScraper(timeout=timeout, output_dir=downloads_dir)
+        download_manager = DownloadManager(downloads_dir=downloads_dir)
+        
         video_links = page_scraper.scrape()
         
         if not video_links:
