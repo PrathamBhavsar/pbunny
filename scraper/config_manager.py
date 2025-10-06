@@ -31,7 +31,7 @@ class ConfigManager:
     
     def _validate_config(self, config: Dict[str, Any]):
         try:
-            required_fields = ['base_url', 'downloads_dir', 'timeout']
+            required_fields = ['base_url', 'downloads_dir', 'timeout', 'pages_per_parse']
             
             for field in required_fields:
                 if field not in config:
@@ -46,6 +46,9 @@ class ConfigManager:
             if not isinstance(config['timeout'], (int, float)) or config['timeout'] <= 0:
                 raise ValueError("timeout must be a positive number")
             
+            if not isinstance(config['pages_per_parse'], int) or config['pages_per_parse'] <= 0:
+                raise ValueError("pages_per_parse must be a positive integer")
+            
         except Exception as e:
             self.logger.error(f"Config validation failed: {e}", exc_info=True)
             raise
@@ -58,6 +61,9 @@ class ConfigManager:
     
     def get_timeout(self) -> int:
         return int(self.config['timeout'])
+    
+    def get_pages_per_parse(self) -> int:
+        return int(self.config['pages_per_parse'])
     
     def get_all(self) -> Dict[str, Any]:
         return self.config.copy()

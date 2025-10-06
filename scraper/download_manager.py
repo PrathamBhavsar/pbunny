@@ -2,6 +2,7 @@ import logging
 import json
 import re
 import subprocess
+import time
 from pathlib import Path
 from typing import List, Dict, Optional
 
@@ -71,55 +72,81 @@ class DownloadManager:
             
             filename = f"{video_id}_{quality}.mp4"
             
+            # Use /d flag to add without prompting, /a to add to queue
             cmd = [
                 self.idm_path,
                 "/d", url,
                 "/p", str(output_dir),
                 "/f", filename,
                 "/n",
-                "/a",
-                "/s"
+                "/a"
             ]
             
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=10
-            )
-            
-            if result.returncode == 0:
-                return True
-            else:
-                self.logger.warning(f"IDM returned {result.returncode} for {url}")
-                return False
-                
-        except subprocess.TimeoutExpired:
-            self.logger.error(f"Timeout adding {url} to IDM")
-            return False
+            # Increased timeout and added retry logic
+            max_retries = 2
+            for attempt in range(max_retries):
+                try:
+                    result = subprocess.run(
+                        cmd,
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                        creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                    )
+                    
+                    if result.returncode == 0:
+                        self.logger.info(f"Queued: {video_id}_{quality}.mp4")
+                        # Small delay to prevent overwhelming IDM
+                        time.sleep(0.5)
+                        return True
+                    else:
+                        if attempt < max_retries - 1:
+                            self.logger.warning(f"IDM returned {result.returncode}, retrying... ({attempt + 1}/{max_retries})")
+                            time.sleep(1)
+                        else:
+                            self.logger.warning(f"IDM returned {result.returncode} for {url} after {max_retries} attempts")
+                            return False
+                            
+                except subprocess.TimeoutExpired:
+                    if attempt < max_retries - 1:
+                        self.logger.warning(f"Timeout adding {url} to IDM, retrying... ({attempt + 1}/{max_retries})")
+                        time.sleep(2)
+                    else:
+                        self.logger.error(f"Timeout adding {url} to IDM after {max_retries} attempts")
+                        return False
+                        
         except Exception as e:
             self.logger.error(f"Error adding {url} to IDM: {e}", exc_info=True)
             return False
+        
+        return False
     
-    def _start_idm_queue(self) -> bool:
+    def _start_idm_downloads(self) -> bool:
+        """Start IDM downloads without closing the application."""
         try:
             if not self.idm_path:
                 return False
             
+            # Use /s flag to start queued downloads
             cmd = [self.idm_path, "/s"]
             
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=5
+                timeout=5,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
             )
             
-            self.logger.info("Started IDM download queue")
-            return result.returncode == 0
+            if result.returncode == 0:
+                self.logger.info("IDM downloads started successfully")
+                return True
+            else:
+                self.logger.warning(f"IDM start command returned code: {result.returncode}")
+                return False
             
         except Exception as e:
-            self.logger.error(f"Error starting IDM queue: {e}", exc_info=True)
+            self.logger.error(f"Error starting IDM downloads: {e}", exc_info=True)
             return False
     
     def process_downloads(self) -> Dict[str, int]:
@@ -154,8 +181,6 @@ class DownloadManager:
                     stats['total'] += 1
                     if self._add_to_idm(url, output_dir, video_id):
                         stats['queued'] += 1
-                        quality = self._extract_quality_from_url(url)
-                        self.logger.info(f"Queued: {video_id}_{quality}.mp4")
                     else:
                         stats['failed'] += 1
             
@@ -164,8 +189,10 @@ class DownloadManager:
                 f"Queued: {stats['queued']}, Failed: {stats['failed']}"
             )
             
+            # Start downloads if any were queued
             if stats['queued'] > 0:
-                self._start_idm_queue()
+                self.logger.info("Starting IDM downloads...")
+                self._start_idm_downloads()
             
             return stats
             

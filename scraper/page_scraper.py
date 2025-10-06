@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional
+from typing import List, Optional, Tuple
 import httpx
 from selectolax.parser import HTMLParser
 
@@ -9,10 +9,11 @@ logging.basicConfig(
 )
 
 class PageScraper:
-    def __init__(self, base_url: str, timeout: int = 30):
+    def __init__(self, base_url: str, timeout: int = 30, pages_per_parse: int = 10):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.base_url_template = base_url.replace('/1/', '/{}/')
         self.timeout = timeout
+        self.pages_per_parse = pages_per_parse
         
     def fetch_html(self, page: int) -> Optional[str]:
         try:
@@ -24,7 +25,7 @@ class PageScraper:
                 return response.text
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
-                self.logger.info(f"Page {page}: 404 - No more pages")
+                self.logger.info(f"Page {page}: 404 - Page not found")
                 return None
             self.logger.error(f"Page {page}: HTTP error {e.response.status_code}")
             return None
@@ -54,30 +55,53 @@ class PageScraper:
             self.logger.error(f"Error parsing HTML: {e}", exc_info=True)
             return []
     
-    def scrape(self) -> List[str]:
+    def scrape(self, start_page: Optional[int] = None) -> Tuple[List[str], int]:
+        """
+        Scrape video links in reverse order (decrementing page numbers).
+        Returns: (list of video links, last successfully parsed page)
+        """
         try:
-            page = 1526
-            all_links = []
+            # If start_page is provided, use it; otherwise start from default
+            if start_page is None:
+                page = 1526
+                self.logger.info(f"Starting from default page: {page}")
+            else:
+                page = start_page
+                self.logger.info(f"Resuming from page: {page}")
             
-            while True:
-                self.logger.info(f"Scraping page {page}")
+            all_links = []
+            pages_parsed = 0
+            last_successful_page = page
+            
+            while page >= 1 and pages_parsed < self.pages_per_parse:
+                self.logger.info(f"Scraping page {page} (Progress: {pages_parsed + 1}/{self.pages_per_parse})")
                 html = self.fetch_html(page)
                 
                 if not html:
-                    self.logger.info(f"Stopping at page {page}")
+                    self.logger.warning(f"Page {page}: Failed to fetch, stopping")
                     break
                 
                 links = self.parse_video_links(html)
                 if not links:
-                    self.logger.warning(f"Page {page}: No links found")
+                    self.logger.warning(f"Page {page}: No links found, stopping")
                     break
                 
                 all_links.extend(links)
-                self.logger.info(f"Page {page}: Found {len(links)} links (Total: {len(all_links)})")
-                page += 1
+                last_successful_page = page
+                pages_parsed += 1
+                
+                self.logger.info(f"Page {page}: Found {len(links)} links (Total: {len(all_links)}, Pages: {pages_parsed}/{self.pages_per_parse})")
+                
+                # Move to previous page
+                page -= 1
             
-            return all_links
+            if page < 1:
+                self.logger.info("Reached page 1, scraping complete")
+            elif pages_parsed >= self.pages_per_parse:
+                self.logger.info(f"Completed {self.pages_per_parse} pages for this parse session")
+            
+            return all_links, last_successful_page
             
         except Exception as e:
             self.logger.error(f"Scraping failed: {e}", exc_info=True)
-            return []
+            return [], last_successful_page if 'last_successful_page' in locals() else (start_page or 1526)
