@@ -8,7 +8,7 @@ from selectolax.parser import HTMLParser
 
 
 class VideoScraper:
-    def __init__(self, timeout: int = 30, output_dir: str = "./downloads"):
+    def __init__(self, timeout: int, output_dir: str):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.timeout = timeout
         self.output_dir = Path(output_dir)

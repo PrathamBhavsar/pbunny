@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import List, Dict, Optional
 
 class DownloadManager:
-    def __init__(self, downloads_dir: str = "./downloads"):
+    def __init__(self, downloads_dir: str):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.downloads_dir = Path(downloads_dir)
         self.idm_path = self._find_idm()
